@@ -1,46 +1,55 @@
+;; -*- mode: lisp -*-
+#-quicklisp
+(let ((quicklisp-init (merge-pathnames "quicklisp/setup.lisp"
+				       (user-homedir-pathname))))
+  (when (probe-file quicklisp-init)
+    (load quicklisp-init)))
+
+(ql:quickload "stumpwm")
 (in-package :stumpwm)
-(setf *default-package* :stumpwm)
 
-;; General config
-(run-shell-command "xss-lock -- slock &")
 (init-load-path #p"~/.config/stumpwm/modules/")
-(run-shell-command "xwallpaper --zoom ~/.config/stumpwm/gruv.jpg" t)
+(run-shell-command "picom &")
 (run-shell-command "polybar --reload")
+(run-shell-command "gsettings set org.gnome.settings-daemon.peripherals.touchpad natural-scroll true")
+;; Nat scrolling
+(run-shell-command "xwallpaper --zoom ~/.config/stumpwm/mocha.png" t)
 
-;; Slynk
+;; Slynk Calling
 (ql:quickload :slynk)
 (defcommand slynk () ()
   (sb-thread:make-thread
    (lambda ()
      (slynk:create-server :port 4005 :dont-close t))))
 
+;; Fonts
+(load-module "ttf-fonts")
+(pushnew (concat (getenv "HOME")
+                 "/.local/share/fonts/")
+         xft:*font-dirs* :test #'string=)
+(xft:cache-fonts)
+(set-font (make-instance 'xft:font :family "DejaVu Sans Mono" :subfamily "Book" :size 11))
+
 ;; Colors
 (setf *colors*
-      '("#32302f"   ;black
-        "#fb4934"   ;red
-        "#8ec07c"   ;green
-        "#d79921"   ;yellow
-        "#458588"   ;blue
-        "#b16286"   ;magenta
-        "#83a598"   ;cyan
-        "#ebdbb2")) ;white
-
-;; Fonts
-;; (load-module "ttf-fonts")
-;; (ql:quickload :clx-truetype)
-;; (clx-truetype:cache-fonts)
-
-;; (set-font (make-instance 'xft:font
-;;                          :family "Agave Nerd Font"
-;;                          :subfamily "Regular"
-;;                          :size 10
-;;                          :antialias t))
+      '("#1e1e2e"   ;black
+        "#f38ba8"   ;red
+        "#a6e3a1"   ;green
+        "#f9e2af"   ;yellow
+        "#89b4fa"   ;blue
+        "#eba0ac"   ;magenta
+        "#94e2d5"   ;cyan
+        "#cdd6f4")) ;white
+(when *initializing*
+  (update-color-map (current-screen)))
 
 ;; Gaps
 (load-module "swm-gaps")
-(setf swm-gaps:*inner-gaps-size* 4
-      swm-gaps:*outer-gaps-size* 2)
-(swm-gaps:toggle-gaps-on)
+(setf swm-gaps:*inner-gaps-size* 6
+      swm-gaps:*outer-gaps-size* 3
+      swm-gaps:*head-gaps-size* 0)
+(when *initializing*
+  (swm-gaps:toggle-gaps))
 
 ;; Workspaces
 (defvar *workspaces* (list "1" "2" "3" "4" "5"))
@@ -48,36 +57,29 @@
 (dolist (workspace (cdr *workspaces*))
   (stumpwm:gnewbg workspace))
 
+;; Keybinds
+;;; Navigation
 (defvar *move-to-keybinds* (list "!" "@"  "#" "$" "%" "^" "&" "*" "("))
-(dotimes (y (length *workspaces*))
+(Dotimes (y (length *workspaces*))
   (let ((workspace (write-to-string (+ y 1))))
-    (define-key *root-map* (kbd workspace) (concat "gselect " workspace))
-    (define-key *root-map* (kbd (nth y *move-to-keybinds*)) (concat "gmove-and-follow " workspace))))
+    (define-key *top-map* (kbd (concat "M-" workspace)) (concat "gselect " workspace))
+    (define-key *top-map* (kbd (concat "M-" (nth y *move-to-keybinds*))) (concat "gmove-and-follow " workspace))))
 
-;; Keymaps
+;;; Apps
+(define-key *root-map* (kbd "w") "exec librewolf")
+(define-key *root-map* (kbd "RET") "exec st")
 
+;;; Shortcuts
+(define-key *root-map* (kbd "d") "exec rofi -show drun")
+(define-key *root-map* (kbd "l") "exec /home/damian/.config/stumpwm/scripts/blur-lock")
+(define-key *root-map* (kbd "q") "quit-confirm")
 
-
-(define-key *root-map* (kbd "space") "exec")
-(define-key *top-map* (kbd "M-space") "exec")
-(define-key *top-map* (kbd "M-;") "colon")
-(define-key *root-map* (kbd "w") "exec brave-browser")
-(define-key *root-map* (kbd "RET") "exec kitty")
-
-(defcommand hsplit-and-focus () ()
-  "create a new frame on the right and focus it"
-  (hsplit)
-  (move-focus :right))
-
-(defcommand vsplit-and-focus () ()
-  "create a new frame below and focus it"
-  (vsplit)
-  (move-focus :down))
-
-(define-key *root-map* (kbd "v") "hsplit-and-focus")
-(define-key *root-map* (kbd "s") "vsplit-and-focus")
-
+;;; Power Keys
 (define-key *top-map* (kbd "XF86AudioMute") "exec pamixer -t")
+(define-key *top-map* (kbd "XF86AudioRaiseVolume") "exec pamixer --allow-boost -i 5")
+(define-key *top-map* (kbd "XF86AudioLowerVolume") "exec pamixer --allow-boost -d 5")
+(define-key *top-map* (kbd "XF86MonBrightnessUp") "exec brightnessctl set 5%+")
+(define-key *top-map* (kbd "XF86MonBrightnessDown") "exec brightnessctl set 5%-")
 (define-key *top-map* (kbd "XF86AudioRaiseVolume") "exec pamixer --allow-boost -i 5")
 (define-key *top-map* (kbd "XF86AudioLowerVolume") "exec pamixer --allow-boost -d 5")
 (define-key *top-map* (kbd "XF86MonBrightnessUp") "exec brightnessctl set 7%+")
